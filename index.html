@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>灵感库 · MVP</title>
+  <!-- Tailwind CDN (no build needed) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            soft: '0 4px 24px rgba(0,0,0,.08)'
+          }
+        }
+      },
+      darkMode: 'class'
+    }
+  </script>
+  <style>
+    /* Hide number input arrows in some browsers */
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button{ -webkit-appearance: none; margin:0; }
+  </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 grid place-items-center font-bold">IN</div>
+        <h1 class="text-2xl sm:text-3xl font-semibold">灵感库 <span class="text-zinc-400 text-base align-middle">· MVP</span></h1>
+      </div>
+      <div class="flex-1"></div>
+      <div class="flex items-center gap-2">
+        <button id="toggleDark" class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-sm">切换明/暗</button>
+        <button id="exportBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm">导出 JSON</button>
+        <label class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-sm cursor-pointer">
+          导入 JSON<input id="importFile" type="file" accept="application/json" class="hidden">
+        </label>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div class="col-span-2 flex gap-2">
+        <input id="searchInput" type="text" placeholder="搜索标题 / 备注 / 域名..." class="flex-1 px-4 py-2 rounded-xl bg-white dark:bg-zinc-900 shadow-soft outline-none focus:ring-2 ring-zinc-300 dark:ring-zinc-700">
+        <button id="resetFilters" class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">清空筛选</button>
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button id="addBtn" class="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white dark:bg-white dark:text-zinc-900">+ 新建</button>
+      </div>
+    </section>
+
+    <!-- Tag filters -->
+    <section id="tagBar" class="flex flex-wrap gap-2 mb-4"></section>
+
+    <!-- List -->
+    <section id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></section>
+
+    <!-- Empty state -->
+    <section id="emptyState" class="hidden border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 text-center text-zinc-500">
+      还没有内容，点击右上角「+ 新建」添加你的第一个网址。
+    </section>
+
+    <!-- Modal -->
+    <dialog id="modal" class="rounded-2xl p-0 w-full max-w-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+      <form id="form" method="dialog">
+        <div class="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <h3 id="modalTitle" class="text-lg font-medium">添加网址</h3>
+          <button type="button" id="closeModal" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-sm mb-1">标题</label>
+            <input id="title" required class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">URL</label>
+            <input id="url" type="url" required placeholder="https://" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">标签（用逗号分隔）</label>
+            <input id="tags" placeholder="UI, 插画, 3D" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">备注</label>
+            <textarea id="notes" rows="3" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">封面图片 URL（可选）</label>
+            <input id="cover" placeholder="https://example.com/cover.jpg" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+        </div>
+        <div class="p-5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <button id="deleteBtn" type="button" class="hidden px-4 py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300">删除</button>
+          <div class="flex-1"></div>
+          <button type="button" id="cancelBtn" class="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 mr-2">取消</button>
+          <button id="saveBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer class="mt-10 text-center text-xs text-zinc-400">前端纯 HTML 单文件 · 本地存储（localStorage） · 便于后续接入后端</footer>
+  </div>
+
+  <script>
+    // ----- Storage Layer (can swap to API later) -----
+    const STORE_KEY = 'inspiration.links.v1';
+    const getNowISO = () => new Date().toISOString();
+    const parseTags = (raw) => (raw || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    const uniq = (arr) => Array.from(new Set(arr));
+
+    function loadAll() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+      catch { return []; }
+    }
+    function saveAll(list) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(list));
+    }
+
+    // Seed sample on first run
+    (function seed() {
+      const existing = loadAll();
+      if (existing.length) return;
+      const sample = [
+        { id: crypto.randomUUID(), title: 'LottieFiles – Motion', url: 'https://lottiefiles.com/', notes: '高质量动效资源', tags: ['动效','UI'], cover: '', domain: 'lottiefiles.com', createdAt: getNowISO() },
+        { id: crypto.randomUUID(), title: 'Awwwards – Sites', url: 'https://www.awwwards.com/sites/', notes: '优秀网站收录', tags: ['网页','灵感'], cover: '', domain: 'www.awwwards.com', createdAt: getNowISO() },
+        { id: crypto.randomUUID(), title: 'Color Hunt – Palettes', url: 'https://colorhunt.co/', notes: '配色灵感', tags: ['色彩'], cover: '', domain: 'colorhunt.co', createdAt: getNowISO() },
+      ];
+      saveAll(sample);
+    })();
+
+    // ----- UI State -----
+    let editingId = null; // null = create; otherwise edit
+    let activeTag = null;
+    let keyword = '';
+
+    const els = {
+      cards: document.getElementById('cards'),
+      tagBar: document.getElementById('tagBar'),
+      empty: document.getElementById('emptyState'),
+      addBtn: document.getElementById('addBtn'),
+      search: document.getElementById('searchInput'),
+      resetFilters: document.getElementById('resetFilters'),
+      exportBtn: document.getElementById('exportBtn'),
+      importFile: document.getElementById('importFile'),
+      toggleDark: document.getElementById('toggleDark'),
+      // modal controls
+      modal: document.getElementById('modal'),
+      modalTitle: document.getElementById('modalTitle'),
+      closeModal: document.getElementById('closeModal'),
+      deleteBtn: document.getElementById('deleteBtn'),
+      cancelBtn: document.getElementById('cancelBtn'),
+      saveBtn: document.getElementById('saveBtn'),
+      title: document.getElementById('title'),
+      url: document.getElementById('url'),
+      tags: document.getElementById('tags'),
+      notes: document.getElementById('notes'),
+      cover: document.getElementById('cover')
+    };
+
+    // ----- Helpers -----
+    function getDomainFromUrl(u) {
+      try { return new URL(u).hostname; } catch { return ''; }
+    }
+    function filtered(list) {
+      return list.filter(item => {
+        const matchTag = activeTag ? item.tags?.includes(activeTag) : true;
+        if (!matchTag) return false;
+        if (!keyword) return true;
+        const hay = [item.title, item.notes, item.domain].join(' ').toLowerCase();
+        return hay.includes(keyword.toLowerCase());
+      });
+    }
+
+    function renderTags(list) {
+      const tags = uniq(list.flatMap(x => x.tags || [])).sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'));
+      els.tagBar.innerHTML = '';
+      if (!tags.length) return;
+      const makeBtn = (t) => {
+        const btn = document.createElement('button');
+        btn.className = `px-3 py-1.5 rounded-xl border ${activeTag===t? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`;
+        btn.textContent = t;
+        btn.onclick = () => { activeTag = activeTag===t? null : t; render(); };
+        return btn;
+      };
+      const allBtn = document.createElement('button');
+      allBtn.className = `px-3 py-1.5 rounded-xl border ${activeTag===null? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`;
+      allBtn.textContent = '全部';
+      allBtn.onclick = () => { activeTag = null; render(); };
+      els.tagBar.appendChild(allBtn);
+      tags.forEach(t => els.tagBar.appendChild(makeBtn(t)));
+    }
+
+    function renderCards(list) {
+      if (!list.length) {
+        els.cards.innerHTML = '';
+        els.empty.classList.remove('hidden');
+        return;
+      }
+      els.empty.classList.add('hidden');
+      els.cards.innerHTML = list.map(item => `
+        <article class="rounded-2xl bg-white dark:bg-zinc-900 shadow-soft overflow-hidden border border-zinc-100 dark:border-zinc-800">
+          <a href="${item.url}" target="_blank" rel="noopener" class="block group">
+            ${item.cover ? `
+              <div class="h-40 bg-zinc-100 dark:bg-zinc-800">
+                <img src="${item.cover}" alt="cover" class="w-full h-40 object-cover">
+              </div>
+            ` : `
+              <div class="h-40 bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-700 grid place-items-center text-zinc-400">
+                <div class="text-sm">${item.domain || 'No Cover'}</div>
+              </div>
+            `}
+            <div class="p-4">
+              <h3 class="font-medium mb-1 group-hover:underline">${escapeHtml(item.title)}</h3>
+              <p class="text-xs text-zinc-500 mb-2">${item.domain}</p>
+              ${item.notes ? `<p class="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2 mb-3">${escapeHtml(item.notes)}</p>` : ''}
+              <div class="flex flex-wrap gap-2">
+                ${(item.tags||[]).map(t=>`<span class="text-xs px-2 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800">${escapeHtml(t)}</span>`).join('')}
+              </div>
+            </div>
+          </a>
+          <div class="px-4 pb-4 -mt-2 flex items-center gap-2">
+            <button data-id="${item.id}" class="editBtn text-sm px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">编辑</button>
+            <button data-id="${item.id}" class="copyBtn text-sm px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">复制链接</button>
+          </div>
+        </article>
+      `).join('');
+
+      // bind dynamic buttons
+      els.cards.querySelectorAll('.editBtn').forEach(btn => btn.onclick = () => openEdit(btn.dataset.id));
+      els.cards.querySelectorAll('.copyBtn').forEach(btn => btn.onclick = async () => {
+        const it = loadAll().find(x=>x.id===btn.dataset.id);
+        if (!it) return;
+        try { await navigator.clipboard.writeText(it.url); toast('已复制链接'); } catch { toast('复制失败'); }
+      });
+    }
+
+    function escapeHtml(str=''){
+      return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+    }
+
+    function render() {
+      const list = loadAll()
+        .slice()
+        .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      renderTags(list);
+      const l2 = filtered(list);
+      renderCards(l2);
+    }
+
+    // ----- Modal Logic -----
+    function openCreate() {
+      editingId = null;
+      els.modalTitle.textContent = '添加网址';
+      els.deleteBtn.classList.add('hidden');
+      els.title.value = '';
+      els.url.value = '';
+      els.tags.value = '';
+      els.notes.value = '';
+      els.cover.value = '';
+      els.modal.showModal();
+    }
+
+    function openEdit(id) {
+      const it = loadAll().find(x => x.id === id);
+      if (!it) return;
+      editingId = id;
+      els.modalTitle.textContent = '编辑网址';
+      els.deleteBtn.classList.remove('hidden');
+      els.title.value = it.title || '';
+      els.url.value = it.url || '';
+      els.tags.value = (it.tags||[]).join(', ');
+      els.notes.value = it.notes || '';
+      els.cover.value = it.cover || '';
+      els.modal.showModal();
+    }
+
+    function closeModal(){ els.modal.close(); }
+
+    function handleSave(e) {
+      e.preventDefault();
+      const title = els.title.value.trim();
+      const url = els.url.value.trim();
+      if (!title || !url) return;
+      const tags = uniq(parseTags(els.tags.value));
+      const notes = els.notes.value.trim();
+      const cover = els.cover.value.trim();
+      const domain = getDomainFromUrl(url);
+      const list = loadAll();
+
+      if (editingId) {
+        const idx = list.findIndex(x=>x.id===editingId);
+        if (idx>-1) {
+          list[idx] = { ...list[idx], title, url, tags, notes, cover, domain };
+        }
+      } else {
+        list.push({ id: crypto.randomUUID(), title, url, tags, notes, cover, domain, createdAt: getNowISO() });
+      }
+      saveAll(list);
+      closeModal();
+      render();
+      toast('已保存');
+    }
+
+    function handleDelete(){
+      if (!editingId) return;
+      const list = loadAll().filter(x => x.id !== editingId);
+      saveAll(list);
+      closeModal();
+      render();
+      toast('已删除');
+    }
+
+    // ----- Import / Export -----
+    function exportJson(){
+      const data = loadAll();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'inspiration-links.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function importJson(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const incoming = JSON.parse(reader.result);
+          if (!Array.isArray(incoming)) throw new Error('格式不正确');
+          // simple merge (no dedupe here)
+          const merged = loadAll().concat(incoming);
+          saveAll(merged);
+          render();
+          toast('导入完成');
+        } catch(e){
+          alert('导入失败：' + e.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ----- Dark Mode -----
+    function setDark(on){ document.documentElement.classList.toggle('dark', !!on); localStorage.setItem('inspiration.dark', on? '1':'0'); }
+    (function initDark(){ setDark(localStorage.getItem('inspiration.dark')==='1'); })();
+
+    // ----- Toast -----
+    let toastTimer = null;
+    function toast(msg){
+      let t = document.getElementById('toast');
+      if(!t){
+        t = document.createElement('div');
+        t.id = 'toast';
+        t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-soft';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=>{ t.style.opacity = '0'; }, 1600);
+    }
+
+    // ----- Events -----
+    els.addBtn.onclick = openCreate;
+    els.closeModal.onclick = closeModal;
+    els.cancelBtn.onclick = closeModal;
+    els.saveBtn.onclick = handleSave;
+    els.deleteBtn.onclick = handleDelete;
+    els.search.oninput = () => { keyword = els.search.value.trim(); render(); };
+    els.resetFilters.onclick = () => { keyword=''; activeTag=null; els.search.value=''; render(); };
+    els.exportBtn.onclick = exportJson;
+    els.importFile.onchange = (e) => { const f = e.target.files?.[0]; if (f) importJson(f); e.target.value = ''; };
+    els.toggleDark.onclick = () => setDark(!(localStorage.getItem('inspiration.dark')==='1'));
+
+    // initial render
+    render();
+  </script>
+</body>
+</html>
