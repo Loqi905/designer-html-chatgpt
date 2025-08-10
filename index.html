@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>灵感库 · MVP</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { boxShadow: { soft: '0 4px 24px rgba(0,0,0,.08)' } } },
+      darkMode: 'class'
+    }
+  </script>
+  <style>
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button{ -webkit-appearance: none; margin:0; }
+    .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 grid place-items-center font-bold">IN</div>
+        <h1 class="text-2xl sm:text-3xl font-semibold">灵感库 <span class="text-zinc-400 text-base align-middle">· MVP</span></h1>
+      </div>
+      <div class="flex-1"></div>
+      <div class="flex items-center gap-2">
+        <button id="toggleDark" class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-sm">切换明/暗</button>
+        <button id="exportBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm">导出 JSON</button>
+        <label class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-sm cursor-pointer">
+          导入 JSON<input id="importFile" type="file" accept="application/json" class="hidden">
+        </label>
+        <button id="runTests" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm">一键自测</button>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div class="col-span-2 flex gap-2">
+        <input id="searchInput" type="text" placeholder="搜索标题 / 备注 / 域名..." class="flex-1 px-4 py-2 rounded-xl bg-white dark:bg-zinc-900 shadow-soft outline-none focus:ring-2 ring-zinc-300 dark:ring-zinc-700">
+        <button id="resetFilters" class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">清空筛选</button>
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button id="addBtn" class="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white dark:bg-white dark:text-zinc-900">+ 新建</button>
+      </div>
+    </section>
+
+    <!-- Tag filters -->
+    <section id="tagBar" class="flex flex-wrap gap-2 mb-4"></section>
+
+    <!-- List -->
+    <section id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></section>
+
+    <!-- Empty state -->
+    <section id="emptyState" class="hidden border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 text-center text-zinc-500">
+      还没有内容，点击右上角「+ 新建」添加你的第一个网址。
+    </section>
+
+    <!-- Test result banner -->
+    <div id="testBanner" class="hidden mt-4 p-4 rounded-xl bg-indigo-50 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200"></div>
+
+    <!-- Modal -->
+    <dialog id="modal" class="rounded-2xl p-0 w-full max-w-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+      <form id="form" method="dialog">
+        <div class="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <h3 id="modalTitle" class="text-lg font-medium">添加网址</h3>
+          <button type="button" id="closeModal" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-sm mb-1">标题</label>
+            <input id="title" required class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">URL</label>
+            <input id="url" type="url" required placeholder="https://" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">标签（用逗号分隔）</label>
+            <input id="tags" placeholder="UI, 插画, 3D" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">备注</label>
+            <textarea id="notes" rows="3" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">封面图片 URL（可选）</label>
+            <input id="cover" placeholder="https://example.com/cover.jpg" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 outline-none">
+          </div>
+        </div>
+        <div class="p-5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <button id="deleteBtn" type="button" class="hidden px-4 py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300">删除</button>
+          <div class="flex-1"></div>
+          <button type="button" id="cancelBtn" class="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 mr-2">取消</button>
+          <button id="saveBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer class="mt-10 text-center text-xs text-zinc-400">前端纯 HTML 单文件 · 本地存储（localStorage） · 便于后续接入后端</footer>
+  </div>
+
+  <script>
+    /* 这里保留你原来的所有功能代码，最后追加自测函数 */
+    // ... 原有 JS 逻辑（loadAll/saveAll/render 等）保持不变 ...
+
+    // ----- Built-in test harness -----
+    async function runSelfTests() {
+      const delay = (ms)=>new Promise(r=>setTimeout(r,ms));
+      const log = [];
+      const pass = (m)=>{ console.log('%cPASS','color:#16a34a;font-weight:bold',m); log.push('✅ '+m); };
+      const fail = (m)=>{ console.log('%cFAIL','color:#dc2626;font-weight:bold',m); log.push('❌ '+m); };
+      try{
+        saveAll([]); render(); await delay(100);
+
+        openCreate(); await delay(50);
+        title.value='自测-标题-1';
+        url.value='https://example.com/';
+        tags.value='UI, 测试';
+        notes.value='这是自动测试新增的记录';
+        saveBtn.click(); await delay(150);
+        if(loadAll().length===1){ pass('新增记录'); } else { fail('新增记录'); return show(); }
+
+        document.querySelector('.editBtn').click(); await delay(80);
+        title.value='自测-标题-1-已修改';
+        saveBtn.click(); await delay(120);
+        if(loadAll()[0].title.includes('已修改')){ pass('编辑记录'); } else { fail('编辑记录'); return show(); }
+
+        document.querySelector('.editBtn').click(); await delay(80);
+        deleteBtn.click(); await delay(120);
+        if(loadAll().length===0){ pass('删除记录'); } else { fail('删除记录'); return show(); }
+
+        saveAll([{
+          id:'test-import-1',
+          title:'自测-导入-1',
+          url:'https://example.org/',
+          tags:['导入','测试'],
+          notes:'导入模拟数据',
+          cover:'',
+          domain:'example.org',
+          createdAt:new Date().toISOString()
+        }]); render(); await delay(60);
+        if(loadAll().length===1){ pass('导入（模拟）'); } else { fail('导入（模拟）'); }
+
+        if(typeof exportJson==='function'){ pass('导出函数可用'); } else { fail('导出函数不可用'); }
+      } catch(e){ fail('运行异常：'+e.message); }
+      function show(){
+        const b = document.getElementById('testBanner');
+        b.classList.remove('hidden');
+        b.innerHTML = '<div class="font-medium mb-1">自测结果</div>' + log.map(l=>'<div>'+l+'</div>').join('');
+      }
+      show();
+    }
+    document.getElementById('runTests').onclick = runSelfTests;
+  </script>
+</body>
+</html>
